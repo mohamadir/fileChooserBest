@@ -20,12 +20,21 @@ import android.widget.TextView;
 import com.nbsp.materialfilepicker.MaterialFilePicker;
 import com.nbsp.materialfilepicker.ui.FilePickerActivity;
 
+import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
+
+import okhttp3.MediaType;
+import okhttp3.MultipartBody;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
 
 
 public class MainActivity extends AppCompatActivity {
@@ -81,7 +90,7 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, final Intent data) {
-        if (requestCode == 10 && resultCode == RESULT_OK) {
+        /*if (requestCode == 10 && resultCode == RESULT_OK) {
             File f = new File(data.getStringExtra(FilePickerActivity.RESULT_FILE_PATH));
             String content_type = getMimeType(f.getPath());
             Log.i("content_type",getMimeType(f.getPath()));
@@ -111,10 +120,61 @@ public class MainActivity extends AppCompatActivity {
             } catch (IOException e) {
                 e.printStackTrace();
             }
+        }*/
+        if(requestCode == 10 && resultCode == RESULT_OK){
 
-            Log.i("toBase64",output64.toString());
+            progress = new ProgressDialog(MainActivity.this);
+            progress.setTitle("Uploading");
+            progress.setMessage("Please wait...");
+            progress.show();
+
+            Thread t = new Thread(new Runnable() {
+                @Override
+                public void run() {
+
+                    File f  = new File(data.getStringExtra(FilePickerActivity.RESULT_FILE_PATH));
+                    String content_type  = getMimeType(f.getPath());
+
+                    String file_path = f.getAbsolutePath();
+                    OkHttpClient client = new OkHttpClient();
+                    RequestBody file_body = RequestBody.create(MediaType.parse(content_type),f);
+
+                    RequestBody request_body = new MultipartBody.Builder()
+                            .setType(MultipartBody.FORM)
+                            .addFormDataPart("type",content_type)
+                            .addFormDataPart("uploaded_file",file_path.substring(file_path.lastIndexOf("/")+1), file_body)
+                            .build();
+
+                    Request request = new Request.Builder()
+                            .url("http://172.104.150.56/api/upload")
+                            .post(request_body)
+                            .build();
+
+                    try {
+                        Response response = client.newCall(request).execute();
+
+                        if(!response.isSuccessful()){
+                            throw new IOException("Error : "+response);
+                        }
+
+                        progress.dismiss();
+
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+
+
+                }
+            });
+
+            t.start();
+
+
+
+
         }
     }
+
     private String getMimeType(String path) {
 
         String extension = MimeTypeMap.getFileExtensionFromUrl(path);
