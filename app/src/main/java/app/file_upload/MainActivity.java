@@ -16,6 +16,7 @@ import android.view.View;
 import android.webkit.MimeTypeMap;
 import android.widget.Button;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.nbsp.materialfilepicker.MaterialFilePicker;
 import com.nbsp.materialfilepicker.ui.FilePickerActivity;
@@ -41,7 +42,7 @@ public class MainActivity extends AppCompatActivity {
 
     private Button button;
     TextView tv,tvSize;
-
+    public static String str="";
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -121,13 +122,13 @@ public class MainActivity extends AppCompatActivity {
                 e.printStackTrace();
             }
         }*/
+
         if(requestCode == 10 && resultCode == RESULT_OK){
 
             progress = new ProgressDialog(MainActivity.this);
             progress.setTitle("Uploading");
             progress.setMessage("Please wait...");
             progress.show();
-
             Thread t = new Thread(new Runnable() {
                 @Override
                 public void run() {
@@ -138,11 +139,11 @@ public class MainActivity extends AppCompatActivity {
                     String file_path = f.getAbsolutePath();
                     OkHttpClient client = new OkHttpClient();
                     RequestBody file_body = RequestBody.create(MediaType.parse(content_type),f);
-
+                    Log.i("typosh",content_type);
                     RequestBody request_body = new MultipartBody.Builder()
                             .setType(MultipartBody.FORM)
                             .addFormDataPart("type",content_type)
-                            .addFormDataPart("uploaded_file",file_path.substring(file_path.lastIndexOf("/")+1), file_body)
+                            .addFormDataPart("file",file_path.substring(file_path.lastIndexOf("/")+1), file_body)
                             .build();
 
                     Request request = new Request.Builder()
@@ -152,14 +153,19 @@ public class MainActivity extends AppCompatActivity {
 
                     try {
                         Response response = client.newCall(request).execute();
+                        Log.i("errore",response.body().string());
 
+                        str=response.toString();
+//                        Toast.makeText(MainActivity.this, "success", Toast.LENGTH_SHORT).show();
                         if(!response.isSuccessful()){
                             throw new IOException("Error : "+response);
                         }
+                        else
 
-                        progress.dismiss();
+                      progress.dismiss();
 
                     } catch (IOException e) {
+                        Log.i("errore",e.getMessage());
                         e.printStackTrace();
                     }
 
@@ -169,7 +175,7 @@ public class MainActivity extends AppCompatActivity {
 
             t.start();
 
-
+            Toast.makeText(MainActivity.this, str, Toast.LENGTH_SHORT).show();
 
 
         }
