@@ -9,29 +9,27 @@ import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
-import android.util.Base64;
-import android.util.Base64OutputStream;
-import android.util.Log;
 import android.view.View;
 import android.webkit.MimeTypeMap;
 import android.widget.Button;
-import android.widget.TextView;
 
 import com.nbsp.materialfilepicker.MaterialFilePicker;
 import com.nbsp.materialfilepicker.ui.FilePickerActivity;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.InputStream;
 
+import okhttp3.MediaType;
+import okhttp3.MultipartBody;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
 
 public class MainActivity extends AppCompatActivity {
 
     private Button button;
-    TextView tv,tvSize;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -39,8 +37,7 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         button = (Button) findViewById(R.id.button);
-        tv=(TextView)findViewById(R.id.textView);
-        tvSize=(TextView)findViewById(R.id.tvSize);
+
 
         if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M){
             if(ActivityCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED){
@@ -81,40 +78,60 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, final Intent data) {
-        if (requestCode == 10 && resultCode == RESULT_OK) {
-            File f = new File(data.getStringExtra(FilePickerActivity.RESULT_FILE_PATH));
-            String content_type = getMimeType(f.getPath());
-            Log.i("content_type",getMimeType(f.getPath()));
-            tv.setText(f.getPath());
-            tvSize.setText(f.length()+" Bytes");
+        if(requestCode == 10 && resultCode == RESULT_OK){
 
-            InputStream inputStream = null;//You can get an inputStream using any IO API
-            try {
-                inputStream = new FileInputStream(f.getAbsolutePath());
-            } catch (FileNotFoundException e) {
-                e.printStackTrace();
-            }
-            byte[] buffer = new byte[8192];
-            int bytesRead;
-            ByteArrayOutputStream output = new ByteArrayOutputStream();
-            Base64OutputStream output64 = new Base64OutputStream(output, Base64.DEFAULT);
-            try {
-                while ((bytesRead = inputStream.read(buffer)) != -1) {
-                    output64.write(buffer, 0, bytesRead);
+            progress = new ProgressDialog(MainActivity.this);
+            progress.setTitle("Uploading");
+            progress.setMessage("Please wait...");
+            progress.show();
+
+            Thread t = new Thread(new Runnable() {
+                @Override
+                public void run() {
+
+                    File f  = new File(data.getStringExtra(FilePickerActivity.RESULT_FILE_PATH));
+                    String content_type  = getMimeType(f.getPath());
+
+                    String file_path = f.getAbsolutePath();
+                    OkHttpClient client = new OkHttpClient();
+                    RequestBody file_body = RequestBody.create(MediaType.parse(content_type),f);
+
+                    RequestBody request_body = new MultipartBody.Builder()
+                            .setType(MultipartBody.FORM)
+                            .addFormDataPart("type",content_type)
+                            .addFormDataPart("uploaded_file",file_path.substring(file_path.lastIndexOf("/")+1), file_body)
+                            .build();
+
+                    Request request = new Request.Builder()
+                            .url("URL_TO_THE_SERVER/YOUR_SCRIPT.php")
+                            .post(request_body)
+                            .build();
+
+                    try {
+                        Response response = client.newCall(request).execute();
+
+                        if(!response.isSuccessful()){
+                            throw new IOException("Error : "+response);
+                        }
+
+                        progress.dismiss();
+
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+
+
                 }
+            });
 
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-            try {
-                output64.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+            t.start();
 
-            Log.i("toBase64",output64.toString());
+
+
+
         }
     }
+
     private String getMimeType(String path) {
 
         String extension = MimeTypeMap.getFileExtensionFromUrl(path);
